@@ -1,4 +1,5 @@
 import requests
+from requests.exceptions import ConnectionError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -13,12 +14,9 @@ class Auditor():
         engine = create_engine('sqlite:///urls.db')
         Base.metadata.bind = engine
         self.db = sessionmaker(bind=engine)()
-        self.crawl_page(requests.get(HOMEPAGE))
-
-
-    def get_data(self):
-        for webpage in SITEMAP_XML.find_all('loc'):
-            webpage = webpage.string
+        self.crawled = set({})
+        self.crawled_count = 0
+        self.crawl_page(requests.get(HOMEPAGE, headers=HEADERS))
 
 
     def is_affiliate(self, url):
@@ -61,9 +59,13 @@ class Auditor():
         url = self.strip_slash(url)
         query = self.db.query(Outbound).filter_by(url=url)
         if not query.count():
-            resp = requests.get(url, headers=HEADERS)
+            try:
+                resp = requests.get(url, headers=HEADERS)
+                status_code = resp.status_code
+            except ConnectionError:
+                status_code = 512  # no response
             data = {
-                'status': resp.status_code,
+                'status': status_code,
                 'url': url,
                 'parents': parent
             }
@@ -83,13 +85,17 @@ class Auditor():
 
 
     def crawl_page(self, resp):
-        print('Crawling page ' + resp.url, flush=True)
+        if resp.url in self.crawled:
+            return
+        self.crawled.add(resp.url)
+        self.crawled_count += 1
+        path = self.get_inbound_path(resp.url)
+        print(str(self.crawled_count) + ' - ' + path, flush=True)
         html = BeautifulSoup(resp.text, 'lxml')
         for anchor in html.find_all('a'):
             href = self.get_full_href_path(anchor)
             if href is None or href[:4] != 'http':
                 continue
-            path = self.get_inbound_path(resp.url)
             if DOMAIN in href:
                 self.handle_inbound(href, path)
             else:
