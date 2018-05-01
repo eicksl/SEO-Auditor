@@ -8,6 +8,11 @@ from constants import DB_URI
 Base = declarative_base()
 
 
+class UniqueInboundOK(Base):
+    __tablename__ = 'unique-inbound-ok'
+    url = Column(String(250), primary_key=True)
+
+
 class Inbound(Base):
     __tablename__ = 'inbound'
     status = Column(Integer, nullable=False)

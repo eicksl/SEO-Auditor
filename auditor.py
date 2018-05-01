@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from bs4 import BeautifulSoup
 from constants import HEADERS, HOMEPAGE, DOMAIN, AFFILIATE_DOMAINS, DB_URI
-from models import Base, Inbound, Outbound, Affiliate
+from models import Base, Inbound, Outbound, Affiliate, UniqueInboundOK
 
 
 class Auditor():
@@ -108,6 +108,8 @@ class Auditor():
         if resp.url in self.crawled:
             return
         self.crawled.add(resp.url)
+        self.db.add(UniqueInboundOK(url=resp.url))
+        self.db.commit()
         self.crawled_count += 1
         path = self.get_inbound_path(resp.url)
         print(str(self.crawled_count) + ' - ' + path, flush=True)

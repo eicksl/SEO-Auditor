@@ -19,7 +19,8 @@ class SpreadsheetMaker():
             with open(file_path, 'w', encoding='utf-8') as file:
                 file.write('STATUS,DOMAIN,URL,PARENTS,REDIRECT\n')
                 query = self.db.query(Affiliate).filter(
-                        Affiliate.url.contains(domain))
+                        Affiliate.url.contains(domain)).order_by(
+                        Affiliate.status.desc(), Affiliate.url)
                 for entry in query:
                     self.write_entry(file, entry, Affiliate)
 
