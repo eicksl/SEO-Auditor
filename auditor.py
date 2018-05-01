@@ -4,14 +4,14 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from bs4 import BeautifulSoup
-from constants import HEADERS, HOMEPAGE, DOMAIN, AFFILIATE_DOMAINS
+from constants import HEADERS, HOMEPAGE, DOMAIN, AFFILIATE_DOMAINS, DB_URI
 from models import Base, Inbound, Outbound, Affiliate
 
 
 class Auditor():
     def __init__(self):
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-        engine = create_engine('sqlite:///urls.db')
+        engine = create_engine(DB_URI)
         Base.metadata.bind = engine
         self.db = sessionmaker(bind=engine)()
         self.crawled = set({})
@@ -33,6 +33,22 @@ class Auditor():
         return path
 
 
+    def get_redirect_url(self, resp, ok_str, inbound=True):
+        redirected = False
+        for obj in resp.history:
+            if obj.status_code in range(300, 309):
+                redirected = True
+                break
+        if redirected:
+            if inbound:
+                url = self.strip_slash(resp.url).split(DOMAIN)[1]
+            else:
+                url = self.strip_slash(resp.url)
+            if url != ok_str:
+                return url
+        return None
+
+
     def handle_inbound(self, url, parent):
         url = self.strip_slash(url)
         path = url.split(DOMAIN)[1]
@@ -44,7 +60,8 @@ class Auditor():
             data = {
                 'status': resp.status_code,
                 'url': path,
-                'parents': parent
+                'parents': parent,
+                'redirect': self.get_redirect_url(resp, path)
             }
             self.db.add(Inbound(**data))
             self.db.commit()
@@ -62,12 +79,15 @@ class Auditor():
             try:
                 resp = requests.get(url, headers=HEADERS)
                 status_code = resp.status_code
+                redirect = self.get_redirect_url(resp, url, inbound=False)
             except ConnectionError:
                 status_code = 512  # no response
+                redirect = None
             data = {
                 'status': status_code,
                 'url': url,
-                'parents': parent
+                'parents': parent,
+                'redirect': redirect
             }
             self.db.add(Outbound(**data))
             if self.is_affiliate(url):

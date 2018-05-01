@@ -1,6 +1,3 @@
-from bs4 import BeautifulSoup
-
-
 def get_homepage(file_path):
     homepage = None
     with open(file_path) as file:
@@ -31,3 +28,4 @@ HEADERS = {'user-agent': ('Mozilla/5.0 (Linux; Android 6.0; '
 HOMEPAGE = get_homepage('info/homepage.txt')
 DOMAIN = get_domain(HOMEPAGE)
 AFFILIATE_DOMAINS = get_affiliate_domains('info/aff_domains.txt')
+DB_URI = 'sqlite:///urls.db'
